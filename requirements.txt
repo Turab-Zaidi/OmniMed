@@ -1,0 +1,11 @@
+torch
+torchvision
+transformers
+accelerate
+peft
+bitsandbytes
+sentencepiece
+open_clip_torch
+einops
+gradio
+wandb
