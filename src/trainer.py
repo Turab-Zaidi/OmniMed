@@ -6,12 +6,15 @@ from transformers import (
     AutoTokenizer, 
     Trainer, 
     TrainingArguments, 
-    DataCollatorForLanguageModeling
 )
 from model import OmniMedModel
 from dataset import MimicCxrDataset
 import open_clip
 from torchvision import transforms
+import os
+from huggingface_hub import HfApi
+
+
 
 def train():
 
@@ -85,5 +88,37 @@ def train():
     torch.save(model.projector.state_dict(), f"{output_dir}/projector.pt")
     print(f"Training complete. Weights saved to {output_dir}")
 
+
+def save_and_push(model, tokenizer, repo_id):
+    """
+    Saves the small LoRA adapters and the Projector layer to Hugging Face.
+    """
+    local_dir = "./final_model"
+    os.makedirs(local_dir, exist_ok=True)
+
+
+    model.llm.save_pretrained(local_dir)
+    tokenizer.save_pretrained(local_dir)
+
+
+    torch.save(model.projector.state_dict(), f"{local_dir}/projector.pt")
+
+    api = HfApi()
+    
+    api.create_repo(repo_id=repo_id, exist_ok=True)
+    
+    api.upload_folder(
+        folder_path=local_dir,
+        repo_id=repo_id,
+        commit_message="End of Kaggle Training: SOTA MedVLM weights"
+    )
+    print(f" Model successfully pushed to: https://huggingface.co/{repo_id}")
+
+
+
 if __name__ == "__main__":
-    train()
+    model, tokenizer = train() 
+    
+    repo_id = "Turab0104/OmniMed-CXR-Llama3" 
+    save_and_push(model, tokenizer, repo_id)
+    
