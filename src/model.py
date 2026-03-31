@@ -32,7 +32,7 @@ class OmniMedModel(nn.Module):
         self.llm = AutoModelForCausalLM.from_pretrained(
             model_id,
             quantization_config=bnb_config,
-            torch_dtype=torch.float16,
+            dtype=torch.float16,
             low_cpu_mem_usage=True,
             trust_remote_code=True
         )
