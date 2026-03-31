@@ -1,5 +1,6 @@
 import os
 import pandas as pd
+import sys
 import torch
 from sklearn.model_selection import train_test_split
 from transformers import (
@@ -7,12 +8,15 @@ from transformers import (
     Trainer, 
     TrainingArguments, 
 )
-from model import OmniMedModel
-from dataset import MimicCxrDataset
+from src.model import OmniMedModel
+from src.dataset import MimicCxrDataset
 import open_clip
 from torchvision import transforms
 import os
 from huggingface_hub import HfApi
+
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 
 
 
