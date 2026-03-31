@@ -3,7 +3,7 @@ from torch.utils.data import Dataset
 from PIL import Image
 import pandas as pd
 import os
-from utils.main import clean_report
+from ..utils.main import clean_report
 
 class MimicCxrDataset(Dataset):
     def __init__(self, data, tokenizer, transforms, root_dir):
