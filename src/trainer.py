@@ -18,7 +18,7 @@ from huggingface_hub import HfApi
 
 def train():
 
-    model_id = "meta-llama/Meta-Llama-3-8B-Instruct"
+    model_id = "meta-llama/Llama-3.1-8B-Instruct"
     output_dir = "./outputs/omnimed_v1"
     
     tokenizer = AutoTokenizer.from_pretrained(model_id)
@@ -35,7 +35,7 @@ def train():
     
     model.llm.gradient_checkpointing_enable()
 
-    full_df = pd.read_csv("/kaggle/input/mimic-cxr_dataset/cxr_metadata.csv")
+    full_df = pd.read_csv("/kaggle/input/datasets/nikeshreddypatlolla/mimic-cxr-dataset/mimic-cxr-dataset/metadata.csv")
 
     df = full_df[full_df['ViewPosition'].isin(['PA', 'AP'])].reset_index(drop=True)
     
