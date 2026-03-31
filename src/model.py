@@ -5,7 +5,7 @@ from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
 import open_clip
 
 class OmniMedModel(nn.Module):
-    def __init__(self, model_id="meta-llama/Meta-Llama-3-8B-Instruct"):
+    def __init__(self, model_id="meta-llama/Llama-3.1-8B-Instruct"):
         super().__init__()
 
         self.vision_encoder, _, _ = open_clip.create_model_and_transforms(
