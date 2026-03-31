@@ -1,5 +1,7 @@
 import os
+import pandas as pd
 import torch
+from sklearn.model_selection import train_test_split
 from transformers import (
     AutoTokenizer, 
     Trainer, 
@@ -30,12 +32,16 @@ def train():
     
     model.llm.gradient_checkpointing_enable()
 
-    train_dataset = MimicCxrDataset(
-        csv_file="/kaggle/input/mimic-cxr-subset/train.csv",
-        tokenizer=tokenizer,
-        transforms=img_transforms,
-        img_dir="/kaggle/input/mimic-cxr-subset/images"
-    )
+    full_df = pd.read_csv("/kaggle/input/mimic-cxr_dataset/cxr_metadata.csv")
+
+    df = full_df[full_df['ViewPosition'].isin(['PA', 'AP'])].reset_index(drop=True)
+    
+    # 90/10 Split
+    train_df, val_df = train_test_split(df, test_size=0.1, random_state=42)
+
+    train_dataset = MimicCxrDataset(train_df, tokenizer, img_transforms, "/kaggle/input/mimic-cxr_dataset")
+    val_dataset = MimicCxrDataset(val_df, tokenizer, img_transforms, "/kaggle/input/mimic-cxr_dataset")
+
 
     # 5. Define Training Arguments
     training_args = TrainingArguments(
@@ -47,9 +53,16 @@ def train():
         learning_rate=2e-4,               # LoRA usually needs higher LR
         fp16=True,                        # Use Mixed Precision for T4
         logging_steps=10,
-        save_strategy="steps",
+
+        evaluation_strategy="steps",        # Eval every X steps
+        eval_steps=100,                     # Run validation every 100 steps
+        save_strategy="steps",              # Save every X steps
         save_steps=100,
-        evaluation_strategy="no",
+        save_total_limit=2,                 # ONLY KEEP 2 BEST CHECKPOINTS (Saves Disk)
+        load_best_model_at_end=True,        # Load the best version after training
+        metric_for_best_model="loss",       # Best model = lowest val loss
+        greater_is_better=False,
+
         report_to="wandb",                # Track progress on your phone/PC
         remove_unused_columns=False,      # Important: Keep 'images' column
         ddp_find_unused_parameters=False  # Required for DDP + LoRA
@@ -60,6 +73,8 @@ def train():
         model=model,
         args=training_args,
         train_dataset=train_dataset,
+        eval_dataset=val_dataset, 
+
     )
 
     # 7. Start Training

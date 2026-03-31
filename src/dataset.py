@@ -6,9 +6,13 @@ import os
 from utils.main import clean_report
 
 class MimicCxrDataset(Dataset):
-    def __init__(self, csv_file, tokenizer, transforms, root_dir):
-        # Load metadata and filter for Frontal views (PA or AP)
-        full_df = pd.read_csv(csv_file)
+    def __init__(self, data, tokenizer, transforms, root_dir):
+
+        if isinstance(data, str):
+            full_df = pd.read_csv(data)
+        else:
+            full_df = data
+
         self.df = full_df[full_df['ViewPosition'].isin(['PA', 'AP'])].reset_index(drop=True)
         
         self.tokenizer = tokenizer
