@@ -3,27 +3,33 @@ import torch.nn as nn
 from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
 import open_clip
+import os
 
 class OmniMedModel(nn.Module):
     def __init__(self, model_id="meta-llama/Llama-3.1-8B-Instruct"):
         super().__init__()
 
+        # Get local rank for device mapping
+        local_rank = int(os.environ.get("LOCAL_RANK", 0))
+        device = f"cuda:{local_rank}"
+
+        # 1. Load Vision Encoder in fp16 to save ~0.8GB VRAM
         self.vision_encoder, _, _ = open_clip.create_model_and_transforms(
             'hf-hub:microsoft/BiomedCLIP-PubMedBERT_256-vit_base_patch16_224',
-            precision='fp16',
-            device='cuda'
-
+            precision='fp16', 
+            device=device 
         )
         self.vision_encoder.visual.output_tokens = True 
 
         for param in self.vision_encoder.parameters():
             param.requires_grad = False
 
+        # 2. Match projector precision to LLM and move to device
         self.projector = nn.Sequential(
             nn.Linear(512, 2048),
             nn.GELU(),
             nn.Linear(2048, 4096)
-        )
+        ).to(dtype=torch.float16, device=device)
 
         bnb_config = BitsAndBytesConfig(
             load_in_4bit=True,
@@ -32,15 +38,19 @@ class OmniMedModel(nn.Module):
             bnb_4bit_use_double_quant=True,
         )
 
+        # 3. Use 'torch_dtype' and ensure it matches bnb compute_dtype
         self.llm = AutoModelForCausalLM.from_pretrained(
             model_id,
             quantization_config=bnb_config,
-            torch_dtype=torch.float16, 
+            torch_dtype=torch.float16, # Correct argument name
             low_cpu_mem_usage=True,
             trust_remote_code=True
         )
 
-        self.llm = prepare_model_for_kbit_training(self.llm)
+        # 4. CRITICAL: Enable checkpointing BEFORE preparation to save the 1.96GB spike
+        self.llm.gradient_checkpointing_enable() 
+        self.llm = prepare_model_for_kbit_training(self.llm, use_gradient_checkpointing=True)
+        
         lora_config = LoraConfig(
             r=16, 
             lora_alpha=32, 
@@ -50,7 +60,6 @@ class OmniMedModel(nn.Module):
             task_type="CAUSAL_LM"
         )
         self.llm = get_peft_model(self.llm, lora_config)
-
 
     def forward(self, images, input_ids, attention_mask, labels=None):
 
