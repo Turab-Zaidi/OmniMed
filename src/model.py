@@ -42,7 +42,7 @@ class OmniMedModel(nn.Module):
         self.llm = AutoModelForCausalLM.from_pretrained(
             model_id,
             quantization_config=bnb_config,
-            torch_dtype=torch.float16, # Correct argument name
+            dtype=torch.float16, # Correct argument name
             low_cpu_mem_usage=True,
             trust_remote_code=True,
             device_map={"": device} # Force LLM to the assigned GPU
