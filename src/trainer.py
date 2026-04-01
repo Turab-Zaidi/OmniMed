@@ -88,9 +88,12 @@ def train():
     print("Starting training on 2x T4 GPUs...")
     trainer.train()
 
-    model.llm.save_pretrained(f"{output_dir}/lora_adapters")
-    torch.save(model.projector.state_dict(), f"{output_dir}/projector.pt")
-    print(f"Training complete. Weights saved to {output_dir}")
+    if trainer.is_world_process_zero():
+        model.llm.save_pretrained(f"{output_dir}/lora_adapters")
+        torch.save(model.projector.state_dict(), f"{output_dir}/projector.pt")
+        print(f"Training complete. Weights saved to {output_dir}")
+    
+    return model, tokenizer
 
 
 def save_and_push(model, tokenizer, repo_id):
