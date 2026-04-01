@@ -44,7 +44,8 @@ class OmniMedModel(nn.Module):
             quantization_config=bnb_config,
             torch_dtype=torch.float16, # Correct argument name
             low_cpu_mem_usage=True,
-            trust_remote_code=True
+            trust_remote_code=True,
+            device_map={"": device} # Force LLM to the assigned GPU
         )
 
         # 4. CRITICAL: Enable checkpointing BEFORE preparation to save the 1.96GB spike
