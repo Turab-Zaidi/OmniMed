@@ -46,8 +46,8 @@ def train():
     # 90/10 Split
     train_df, val_df = train_test_split(df, test_size=0.1, random_state=42)
 
-    train_dataset = MimicCxrDataset(train_df, tokenizer, img_transforms, "/kaggle/input/datasets/nikeshreddypatlolla/mimic-cxr-dataset")
-    val_dataset = MimicCxrDataset(val_df, tokenizer, img_transforms, "/kaggle/input/datasets/nikeshreddypatlolla/mimic-cxr-dataset")
+    train_dataset = MimicCxrDataset(train_df, tokenizer, img_transforms, "/kaggle/input/datasets/nikeshreddypatlolla/mimic-cxr-dataset/mimic-cxr-dataset")
+    val_dataset = MimicCxrDataset(val_df, tokenizer, img_transforms, "/kaggle/input/datasets/nikeshreddypatlolla/mimic-cxr-dataset/mimic-cxr-dataset")
 
 
     # 5. Define Training Arguments
