@@ -127,5 +127,7 @@ if __name__ == "__main__":
     model, tokenizer = train() 
     
     repo_id = "Turab0104/OmniMed-CXR-Llama3" 
-    save_and_push(model, tokenizer, repo_id)
+    if os.environ.get("LOCAL_RANK", "0") == "0":
+        repo_id = "Turab0104/OmniMed-CXR-Llama3" 
+        save_and_push(model, tokenizer, repo_id)
     
