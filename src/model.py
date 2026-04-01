@@ -9,7 +9,10 @@ class OmniMedModel(nn.Module):
         super().__init__()
 
         self.vision_encoder, _, _ = open_clip.create_model_and_transforms(
-            'hf-hub:microsoft/BiomedCLIP-PubMedBERT_256-vit_base_patch16_224'
+            'hf-hub:microsoft/BiomedCLIP-PubMedBERT_256-vit_base_patch16_224',
+            precision='fp16',
+            device='cuda'
+
         )
         self.vision_encoder.visual.output_tokens = True 
 
