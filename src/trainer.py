@@ -64,6 +64,7 @@ def train():
         eval_strategy="steps",        # Eval every X steps
         eval_steps=100,                     # Run validation every 100 steps
         save_strategy="steps",              # Save every X steps
+        per_device_eval_batch_size=2,  # Match training to stay safe
         save_steps=100,
         save_total_limit=2,                 # ONLY KEEP 2 BEST CHECKPOINTS (Saves Disk)
         load_best_model_at_end=True,        # Load the best version after training
