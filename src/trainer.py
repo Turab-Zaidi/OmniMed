@@ -61,11 +61,13 @@ def train():
         fp16=True,                        # Use Mixed Precision for T4
         logging_steps=10,
 
+        save_total_limit=1,              # ONLY KEEP 1 CHECKPOINT
+
         eval_strategy="steps",        # Eval every X steps
-        eval_steps=100,                     # Run validation every 100 steps
+        eval_steps=200,                     # Run validation every 100 steps
         save_strategy="steps",              # Save every X steps
         per_device_eval_batch_size=2,  # Match training to stay safe
-        save_steps=100,
+        save_steps=200,
         save_total_limit=2,                 # ONLY KEEP 2 BEST CHECKPOINTS (Saves Disk)
         load_best_model_at_end=True,        # Load the best version after training
         metric_for_best_model="loss",       # Best model = lowest val loss
