@@ -67,9 +67,8 @@ class OmniMedModel(nn.Module):
     def forward(self, images, input_ids, attention_mask, labels=None):
         # 1. Vision Encoding - CAPTURING THE TRUNK FEATURES
         with torch.no_grad():
-            all_features = self.vision_encoder.visual.forward_features(images)
             
-            # 2. Slice to get only the 196 spatial patches [Batch, 196, 768]
+            all_features = self.vision_encoder.visual.trunk.forward_features(images)                        
             patch_tokens = all_features[:, 1:, :] 
 
         image_tokens = self.projector(patch_tokens) 
