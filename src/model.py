@@ -29,7 +29,7 @@ class OmniMedModel(nn.Module):
             nn.Linear(768, 2048),
             nn.GELU(),
             nn.Linear(2048, 4096)
-        ).to(dtype=torch.float16, device=device)
+        ).to( device=device)
 
         bnb_config = BitsAndBytesConfig(
             load_in_4bit=True,
@@ -67,7 +67,7 @@ class OmniMedModel(nn.Module):
     def forward(self, images, input_ids, attention_mask, labels=None):
         # 1. Vision Encoding - CAPTURING THE TRUNK FEATURES
         with torch.no_grad():
-            
+
             all_features = self.vision_encoder.visual.trunk.forward_features(images)                        
             patch_tokens = all_features[:, 1:, :] 
 
