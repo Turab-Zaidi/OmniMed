@@ -70,7 +70,7 @@ class MimicCxrDataset(Dataset):
             return_tensors="pt", 
             padding="max_length", 
             truncation=True, 
-            max_length=256 
+            max_length=512 
         )
 
         # 4. Create the Labels
