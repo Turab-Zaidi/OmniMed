@@ -26,7 +26,7 @@ class OmniMedModel(nn.Module):
 
         # 2. Match projector precision to LLM and move to device
         self.projector = nn.Sequential(
-            nn.Linear(512, 2048),
+            nn.Linear(768, 2048),
             nn.GELU(),
             nn.Linear(2048, 4096)
         ).to(dtype=torch.float16, device=device)
@@ -62,32 +62,67 @@ class OmniMedModel(nn.Module):
         )
         self.llm = get_peft_model(self.llm, lora_config)
 
-    def forward(self, images, input_ids, attention_mask, labels=None):
+    # src/model.py
 
+    def forward(self, images, input_ids, attention_mask, labels=None):
         with torch.no_grad():
-            # Get the 256 patch tokens [Batch, 256, 512]
-            _, patch_tokens = self.vision_encoder.visual(images)
-        
+            vision_output = self.vision_encoder.visual(images)
+            
+
+            if not isinstance(vision_output, tuple):
+                print(f" FATAL ERROR: Vision encoder returned {type(vision_output)} instead of tuple.")
+                print(f"DEBUG: Actual Shape: {vision_output.shape}")
+                raise RuntimeError(f"STOPPING: Vision Encoder failed to return patches. Found shape {vision_output.shape}")
+
+            _, patch_tokens = vision_output
+            
+            if patch_tokens.ndim != 3:
+                print(f" FATAL ERROR: patch_tokens has invalid rank: {patch_tokens.ndim}")
+                print(f"DEBUG: Actual Shape: {patch_tokens.shape}")
+                raise RuntimeError(f"STOPPING: Expected 3D patches [B, 196, 768], got {patch_tokens.shape}")
+
+            if patch_tokens.shape[1] != 196:
+                print(f" WARNING: Unexpected patch count: {patch_tokens.shape[1]}. Expected 196.")
+            
+            # -----------------------------
+
         image_tokens = self.projector(patch_tokens) 
 
+        # 3. Get text embeddings from Llama-3
         text_embeds = self.llm.get_input_embeddings()(input_ids)
 
+        # --- THE DIMENSION CHECK (Your proposed DDP safety) ---
+        if image_tokens.ndim == 2:
+            image_tokens = image_tokens.unsqueeze(0)
+        if text_embeds.ndim == 2:
+            text_embeds = text_embeds.unsqueeze(0)
+
+        # 4. Concatenate along Sequence Dimension (dim=1)
         combined_embeds = torch.cat((image_tokens, text_embeds), dim=1)
 
-        batch_size = images.shape[0]
-        visual_mask = torch.ones((batch_size, 256), device=images.device)
+        # 5. Masking and Labels
+        batch_size = image_tokens.shape[0]
+        num_patches = image_tokens.shape[1]
+        
+        if attention_mask.ndim == 1:
+            attention_mask = attention_mask.unsqueeze(0)
+            
+        visual_mask = torch.ones((batch_size, num_patches), 
+                                dtype=attention_mask.dtype, 
+                                device=images.device)
         full_attention_mask = torch.cat((visual_mask, attention_mask), dim=1)
 
         if labels is not None:
-            visual_labels = torch.full((batch_size, 256), -100, device=labels.device)
+            if labels.ndim == 1:
+                labels = labels.unsqueeze(0)
+            visual_labels = torch.full((batch_size, num_patches), -100, device=labels.device)
             full_labels = torch.cat((visual_labels, labels), dim=1)
         else:
             full_labels = None
 
-        outputs = self.llm(
+        # 6. Final Forward Pass
+        return self.llm(
             inputs_embeds=combined_embeds, 
             attention_mask=full_attention_mask,
             labels=full_labels
         )
-        
-        return outputs
