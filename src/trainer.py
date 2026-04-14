@@ -61,7 +61,6 @@ def train():
         fp16=True,                        # Use Mixed Precision for T4
         logging_steps=10,
 
-        save_total_limit=1,              # ONLY KEEP 1 CHECKPOINT
 
         eval_strategy="steps",        # Eval every X steps
         eval_steps=200,                     # Run validation every 100 steps
