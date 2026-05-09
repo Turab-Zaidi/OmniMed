@@ -8,6 +8,8 @@ from transformers import (
     Trainer, 
     TrainingArguments, 
 )
+from peft import set_peft_model_state_dict
+from safetensors.torch import load_file as load_safetensors
 from src.model import OmniMedModel
 from src.dataset import MimicCxrDataset
 import open_clip
@@ -31,25 +33,61 @@ class OmniMedTrainer(Trainer):
         # 2. Save ONLY projector weights (~40 MB)
         torch.save(model.projector.state_dict(), os.path.join(output_dir, "projector.pt"))
 
-    def _load_from_checkpoint(self, checkpoint_path):
-        """Override loading to match our custom save format."""
-        model = self.model.module if hasattr(self.model, 'module') else self.model
+    def _load_from_checkpoint(self, checkpoint_path, model=None):
+        """Override loading to match our custom save format.
 
-        # Load LoRA adapters
-        from peft import PeftModel
-        # The base LLM is already loaded in __init__, we just load the adapters
+        Trainer calls this at the end of training to reload the best checkpoint
+        (the one with the lowest eval loss) back into memory. We load the LoRA
+        adapter weights in-place using set_peft_model_state_dict so we don't
+        re-wrap an already-wrapped PeftModel.
+        """
+        if model is None:
+            model = self.model
+        model = model.module if hasattr(model, 'module') else model
+
+        # --- LoRA adapters: load in-place into the existing PeftModel ---
         adapter_path = os.path.join(checkpoint_path, "lora_adapters")
         if os.path.exists(adapter_path):
-            model.llm = PeftModel.from_pretrained(model.llm.base_model, adapter_path)
+            # Prefer safetensors, fall back to .bin for older checkpoints
+            sf_path  = os.path.join(adapter_path, "adapter_model.safetensors")
+            bin_path = os.path.join(adapter_path, "adapter_model.bin")
+            if os.path.exists(sf_path):
+                adapter_state_dict = load_safetensors(sf_path, device="cpu")
+            elif os.path.exists(bin_path):
+                adapter_state_dict = torch.load(bin_path, map_location="cpu")
+            else:
+                adapter_state_dict = None
 
-        # Load projector weights
+            if adapter_state_dict is not None:
+                incompatible = set_peft_model_state_dict(model.llm, adapter_state_dict)
+                if incompatible.unexpected_keys:
+                    print(f"[OmniMedTrainer] Warning: unexpected keys when loading adapters: "
+                          f"{incompatible.unexpected_keys}")
+                print(f"[OmniMedTrainer] Loaded best LoRA adapters from {adapter_path}")
+
+        # --- Projector: plain state dict load ---
         projector_path = os.path.join(checkpoint_path, "projector.pt")
         if os.path.exists(projector_path):
-            model.projector.load_state_dict(torch.load(projector_path, map_location="cpu"))
+            model.projector.load_state_dict(
+                torch.load(projector_path, map_location="cpu")
+            )
+            print(f"[OmniMedTrainer] Loaded best projector from {projector_path}")
 
 
 
-def train():
+def train(max_steps=1000, resume_from_checkpoint=None):
+    """
+    Args:
+        max_steps (int): Total number of steps to train for across ALL sessions.
+            First run:  max_steps=1000  (trains steps 1-1000)
+            Second run: max_steps=2000  (resumes at 1000, trains steps 1001-2000)
+            Third run:  max_steps=3000  (resumes at 2000, trains steps 2001-3000)
+            ...and so on.  Always set to (previous_max + 1000).
+        resume_from_checkpoint (str | None): Path to a checkpoint directory saved
+            by a previous run, e.g.
+            "/kaggle/input/omnimed-run1/outputs/omnimed_v1/checkpoint-1000"
+            Pass None for the very first training session.
+    """
     model_id = "meta-llama/Llama-3.1-8B-Instruct"
     output_dir = "./outputs/omnimed_v1"
 
@@ -78,7 +116,7 @@ def train():
         per_device_train_batch_size=2,
         gradient_accumulation_steps=4,
         warmup_steps=50,
-        max_steps=1000,
+        max_steps=max_steps,
         learning_rate=2e-4,
         fp16=True,
         logging_steps=10,
@@ -106,8 +144,9 @@ def train():
         eval_dataset=val_dataset,
     )
 
-    print("Starting training on 2x T4 GPUs...")
-    trainer.train()
+    print(f"Starting training on 2x T4 GPUs | max_steps={max_steps} | "
+          f"resume={resume_from_checkpoint or 'fresh start'}")
+    trainer.train(resume_from_checkpoint=resume_from_checkpoint)
 
     if trainer.is_world_process_zero():
         model.llm.save_pretrained(f"{output_dir}/lora_adapters")
@@ -136,7 +175,18 @@ def save_and_push(model, tokenizer, repo_id):
 
 
 if __name__ == "__main__":
-    model, tokenizer = train()
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--max_steps", type=int, default=1000,
+                        help="Total steps across all sessions. Increment by 1000 each run.")
+    parser.add_argument("--resume_from_checkpoint", type=str, default=None,
+                        help="Path to checkpoint directory from a previous run.")
+    args = parser.parse_args()
+
+    model, tokenizer = train(
+        max_steps=args.max_steps,
+        resume_from_checkpoint=args.resume_from_checkpoint,
+    )
 
     repo_id = "Turab0104/OmniMed-CXR-Llama3"
     if os.environ.get("LOCAL_RANK", "0") == "0":
