@@ -55,7 +55,9 @@ def generate_report(model, tokenizer, device, image_path, prompt="Describe the f
     
     try:
         image = Image.open(image_path).convert('RGB')
-        img_tensor = img_transforms(image).unsqueeze(0).to(device) # Add batch dimension
+        # Add batch dimension and match the vision encoder's dtype (e.g. float16)
+        vision_dtype = next(model.vision_encoder.parameters()).dtype
+        img_tensor = img_transforms(image).unsqueeze(0).to(device, dtype=vision_dtype)
     except Exception as e:
         print(f"Error loading image: {e}")
         return
