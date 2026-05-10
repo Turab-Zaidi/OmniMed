@@ -39,7 +39,9 @@ def load_inference_model(repo_id="Turab0104/OmniMed-CXR-Llama3"):
     
     # Move model to GPU if available
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    print(f"Moving model to {device}...")
+    print(f"Moving model to {device} and setting compute precision...")
+    # Explicitly cast projector to fp16 to match the vision encoder and LLM
+    model.projector = model.projector.to(device, dtype=torch.float16)
     model = model.to(device)
     model.eval()
     
@@ -55,9 +57,8 @@ def generate_report(model, tokenizer, device, image_path, prompt="Describe the f
     
     try:
         image = Image.open(image_path).convert('RGB')
-        # Add batch dimension and match the vision encoder's dtype (e.g. float16)
-        vision_dtype = next(model.vision_encoder.parameters()).dtype
-        img_tensor = img_transforms(image).unsqueeze(0).to(device, dtype=vision_dtype)
+        # Add batch dimension and force float16 precision to match the model
+        img_tensor = img_transforms(image).unsqueeze(0).to(device, dtype=torch.float16)
     except Exception as e:
         print(f"Error loading image: {e}")
         return
