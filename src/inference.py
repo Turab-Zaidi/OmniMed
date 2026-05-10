@@ -1,9 +1,14 @@
 import torch
+import os
+import sys
+
+# Add the parent directory to sys.path so we can import from src
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 from transformers import AutoTokenizer
 from src.model import OmniMedModel
 from torchvision import transforms
 from PIL import Image
-import os
 from huggingface_hub import hf_hub_download, login
 
 # Optional: Log in to Hugging Face if your repo is private
