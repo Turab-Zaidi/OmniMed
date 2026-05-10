@@ -64,8 +64,9 @@ def generate_report(model, tokenizer, device, image_path, prompt="Describe the f
     
     # 2. Get Image Embeddings
     with torch.no_grad():
-        image_features = model.vision_encoder(img_tensor)
-        projected_features = model.projector(image_features) # Shape: (1, 256, 4096)
+        all_features = model.vision_encoder.visual.trunk.forward_features(img_tensor)
+        patch_tokens = all_features[:, 1:, :] 
+        projected_features = model.projector(patch_tokens) # Shape: (1, 196, 4096)
         
     # 3. Prepare Text Prompt
     system_prompt = "You are an expert radiologist. Analyze the chest X-ray and provide a detailed report."
