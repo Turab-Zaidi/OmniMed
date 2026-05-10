@@ -27,7 +27,11 @@ def load_inference_model(repo_id="Turab0104/OmniMed-CXR-Llama3"):
     print(f"Downloading trained adapters and projector from {repo_id}...")
     
     # Load LoRA Adapters
-    model.llm.load_adapter(repo_id)
+    adapter_path = hf_hub_download(repo_id=repo_id, filename="adapter_model.safetensors")
+    from safetensors.torch import load_file
+    from peft import set_peft_model_state_dict
+    adapter_state_dict = load_file(adapter_path)
+    set_peft_model_state_dict(model.llm, adapter_state_dict)
     
     # Download and load Projector weights
     projector_path = hf_hub_download(repo_id=repo_id, filename="projector.pt")
