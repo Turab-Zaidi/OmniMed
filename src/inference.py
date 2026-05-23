@@ -101,7 +101,6 @@ def generate_report(model, tokenizer, device, image_path, prompt="Describe the f
             max_new_tokens=300,
             temperature=0.3,
             top_p=0.9,
-            repetition_penalty=1.2,
             pad_token_id=tokenizer.eos_token_id
         )
         
